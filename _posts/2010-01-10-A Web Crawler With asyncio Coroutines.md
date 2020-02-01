@@ -367,13 +367,13 @@ Exception: parse error
 下面是个生成器函数：
 
 ```python
->>> def gen_fn():
-...     result = yield 1
-...     print('result of yield: {}'.format(result))
-...     result2 = yield 2
-...     print('result of 2nd yield: {}'.format(result2))
-...     return 'done'
-...     
+def gen_fn():
+    result1 = yield 1
+    print('result of yield: {}'.format(result1))
+    result2 = yield 2
+    print('result of 2nd yield: {}'.format(result2))
+    return 'done'
+    
 ```
 
 当 `Python` 将 `gen_fn` 编译为字节码时，遇到 `yield` 表达式时将 `gen_fn` 视作生成器函数，而非一般的函数。设置标志记住这是个生成器函数：
@@ -410,10 +410,314 @@ Python 生成器封装了栈帧以及对某些代码的引用，即 gen_fn 的�
 -1
 ```
 
+当调用 `send` 时，生成器到达第一个 `yield`，然后暂停。`send` 的返回值是 1，因为 gen 传给 yield 表达式的值是 1：
+
+```
+>>> gen.send(None)
+1
+```
+
+现在，生成器的指令指针距离初始点有 3 个字节码，部分经过编译后的 Python 的 56 个字节：
+
+```
+>>> gen.gi_frame.f_lasti
+3
+>>> len(gen.gi_code.co_code)
+56
+```
+
+生成器可以随时从任何函数中恢复，因为生成器的栈帧实际上不在堆栈上：它在堆上。它在调用层次结构中的位置不是固定的，并且不需要遵循常规函数执行的先进先后顺序。
+
+我们可以将值 “hello” 发送到生成器中，它成为 `yield` 表达式的结果，并且生成器继续进行直到生成 2：
+
+```
+>>> gen.send('hello')
+result of yield: hello
+2
+```
+
+现在，栈帧中包含局部变量 `result`：
+
+```
+>>> gen.gi_frame.f_locals
+{'result': 'hello'}
+```
+
+再次调用 send，生成器从第二个 yield 那里继续运行1，通过引发 `StopIteration` 结束。
+
+```
+>>> gen.send('goodbye')
+result of 2nd yield: goodbye
+Traceback (most recent call last):
+  File "<input>", line 1, in <module>
+StopIteration: done
+```
+
+异常具有值，即生成器的返回值 `'done'`。
 
 ## 使用生成器创建协程
 
+因此，生成器可以暂停，可以使用一个值进行恢复，并且它具有返回值。听起来像是构建异步编程模型的好方法，它没有面条式的回调！我们要构建一个“协程”：一个与程序中其他例程协同调度的例程。我们的协程将是 Python 标准 asyncio 库中的协程的简化版本。与 asyncio 一样，我们将使用生成器、asyncio 和 yield from 语句。
+
+首先，我们需要一种方式来表示协程正在等待的某些未来的结果。下面是一个精简版的实现：
+
+```python
+class Future:
+    def __init__(self):
+        self.result = None
+        self._callbacks = []
+
+    def add_done_callback(self, fn):
+        self._callbacks.append(fn)
+
+    def set_result(self, result):
+        self.result = result
+        for fn in self._callbacks:
+            fn(self)
+```
+
+fulture 实例初始时为等待 (pending)，通过调用 `set_result` 设置为被处理 (resolved)。
+
+让我们调整 fetcher  程序以使用 fultures 和协程。我们用回调编写了 fetch：
+
+```python
+class Fetcher:
+    def fetch(self):
+        self.sock = socket.socket()
+        self.sock.setblocking(False)
+        try:
+            self.sock.connect(('xkcd.com', 80))
+        except BlockingIOError:
+            pass
+        selector.register(self.sock.fileno(),
+                          EVENT_WRITE,
+                          self.connected)
+
+    def connected(self, key, mask):
+        print('connected!')
+        # And so on....
+```
+
+fetch 方法首先连接套接字，然后注册在套接字准备好时执行的回调 `connected`。现在，我们可以将这两个步骤合并为一个协程：
+
+```python
+    def fetch(self):
+        sock = socket.socket()
+        sock.setblocking(False)
+        try:
+            sock.connect(('xkcd.com', 80))
+        except BlockingIOError:
+            pass
+
+        f = Future()
+
+        def on_connected():
+            f.set_result(None)
+
+        selector.register(sock.fileno(),
+                          EVENT_WRITE,
+                          on_connected)
+        yield f
+        selector.unregister(sock.fileno())
+        print('connected!')
+```
+
+现在 fetch 是生成器函数，而非普通的函数，因其包含一个 yield 表达式。我们创建一个等待的 fulture，然后 yield 它以暂停 fetch，直到套接字准备好。内部函数 `on_connected` 处理这个 fulture。
+
+但处理好 fulture 后，如何恢复生成器呢？我们需要一个协成 driver。我们称其为 task:
+
+```python
+class Task:
+    def __init__(self, coro):
+        self.coro = coro
+        f = Future()
+        f.set_result(None)
+        self.step(f)
+
+    def step(self, future):
+        try:
+            next_future = self.coro.send(future.result)
+        except StopIteration:
+            return
+
+        next_future.add_done_callback(self.step)
+
+# Begin fetching http://xkcd.com/353/
+fetcher = Fetcher('/353/')
+Task(fetcher.fetch())
+
+loop()
+```
+
+task 通过向生成器传递 None 来启动生成器。fetch 运行直至 yield 一个 fulture，该 fulture 被 task 捕获为 `next_future`。当套接字完成连接后，事件循环运行回调 on_connected，以处理 future、调用 step 和恢复 fetch。
+
 ## 使用 `yield from` 分解协程
+
+连接套接字后，我们将发送 HTTP GET 请求并读取服务器响应。这些步骤不再需要分散在回调间。我们将它们收集到相同的生成器函数中：
+
+```python
+    def fetch(self):
+        # ... connection logic from above, then:
+        sock.send(request.encode('ascii'))
+
+        while True:
+            f = Future()
+
+            def on_readable():
+                f.set_result(sock.recv(4096))
+
+            selector.register(sock.fileno(),
+                              EVENT_READ,
+                              on_readable)
+            chunk = yield f
+            selector.unregister(sock.fileno())
+            if chunk:
+                self.response += chunk
+            else:
+                # Done reading.
+                break
+```
+
+该代码从套接字读取整个消息，通常看起来很有用。我们如何将其从 fetch 分解为子程序呢？现在，轮到 Python 3 中的 yield from 登场了。它使一个生成器可以委派给另一个生成器。
+
+要了解怎么做到，让我们回到简单的生成器示例：
+
+```
+>>> def gen_fn():
+...     result = yield 1
+...     print('result of yield: {}'.format(result))
+...     result2 = yield 2
+...     print('result of 2nd yield: {}'.format(result2))
+...     return 'done'
+...   
+```
+
+要从另一个生成器调用此生成器，可以使用 yield from 委托给它：
+
+```
+>>> # Generator function:
+>>> def caller_fn():
+...     gen = gen_fn()
+...     rv = yield from gen
+...     print('return value of yield-from: {}'
+...           .format(rv))
+...
+>>> # Make a generator from the
+>>> # generator function.
+>>> caller = caller_fn()
+```
+
+caller 生成器的行为就像 gen 一样，它委托给的生成器是：
+
+```
+>>> caller.send(None)
+1
+>>> caller.gi_frame.f_lasti
+15
+>>> caller.send('hello')
+result of yield: hello
+2
+>>> caller.gi_frame.f_lasti  # Hasn't advanced.
+15
+>>> caller.send('goodbye')
+result of 2nd yield: goodbye
+return value of yield-from: done
+Traceback (most recent call last):
+  File "<input>", line 1, in <module>
+StopIteration
+```
+
+虽然 `caller` 被 `gen` 所 `yield`，但 `caller` 并没有前进。注意。即使内部生成器 `gen` 从一个 `yield` 语句前进到下一个 yield 语句，它的指令指针仍位于 `yield from` 语句的位置 15 处。在外部的 `caller` 看来，我们无法确定 `yield` 的值是来自 `caller` 还是它所委托的生成器。从 `gen` 内部，我们无法判断该值由 `caller` 发送还是由它的外部发送。`yield from` 语句是一个光滑的管道，通过该通道，`yield` 的值可以流入或流出 `gen`，直到 `gen` 完成工作。
+
+协程可以通过 `yield from` 将任务委托给子程序，并收到任务的结果。注意，在上面，`claller `打印了 "return value of yield-from: done"。当 `gen` 完成时，它的返回值变成了 `caller` 中 `yield from` 的值：
+
+```
+    rv = yield from gen
+```
+
+之前，当我们批评基于回调的异步编程时，最直接的抱怨是关于“堆栈撕裂”：当回调引发异常时，堆栈跟踪通常是无用的。它仅显示事件循环正在运行回调，而不知道为什么。协程如何处理呢？
+
+```
+>>> def gen_fn():
+...     raise Exception('my error')
+>>> caller = caller_fn()
+>>> caller.send(None)
+Traceback (most recent call last):
+  File "<input>", line 1, in <module>
+  File "<input>", line 3, in caller_fn
+  File "<input>", line 2, in gen_fn
+Exception: my error
+```
+
+这有用多了！堆栈跟踪显示，当抛出错误时，`caller_fn` 委托给 `gen_fn`。更好的是，我们可以将对子协程的调用包装在异常处理程序中，这与普通子例程相同：
+
+```
+>>> def gen_fn():
+...     yield 1
+...     raise Exception('uh oh')
+...
+>>> def caller_fn():
+...     try:
+...         yield from gen_fn()
+...     except Exception as exc:
+...         print('caught {}'.format(exc))
+...
+>>> caller = caller_fn()
+>>> caller.send(None)
+1
+>>> caller.send('hello')
+caught uh oh
+```
+
+因此，就像常规子程序一样，可以使用子协程分解逻辑。让我们从 fetcher 中分解一些有用的子协程。下面编写 `read` 协程以接收一个块：
+
+```python
+def read(sock):
+    f = Future()
+
+    def on_readable():
+        f.set_result(sock.recv(4096))
+
+    selector.register(sock.fileno(), EVENT_READ, on_readable)
+    chunk = yield f  # Read one chunk.
+    selector.unregister(sock.fileno())
+    return chunk
+```
+
+在 `read` 的基础上使用 `read_all` 协程来接收整个消息：
+
+```python
+def read_all(sock):
+    response = []
+    # Read whole response.
+    chunk = yield from read(sock)
+    while chunk:
+        response.append(chunk)
+        chunk = yield from read(sock)
+
+    return b''.join(response)
+```
+
+如果以正确的方法看待，`yield from `语句将消失，并且这些看起来就像常规函数在阻塞 I/O。但实际上， `read` 和 `read_all` 是协程。`read` 中的 yield 会暂停 `read_all`，直到 I/O 完成。当 `read_all` 暂停时，asyncio 的事件循环进行别的工作并等待别的 I/O 事件；一旦事件就绪，`read_all` 将在下一个循环周期中使用 `read` 的结果进行恢复。
+
+在堆栈的起始点，`fetch` 调用 `read_all`：
+
+```python
+class Fetcher:
+    def fetch(self):
+         # ... connection logic from above, then:
+        sock.send(request.encode('ascii'))
+        self.response = yield from read_all(sock)
+```
+
+奇迹般地，`Task` 类不需要修改。它像以前一样驱动外部的 `fetch` 协程：
+
+```python
+Task(fetcher.fetch())
+loop()
+```
+
+当 read 函数 yield 一个 fulture 时，task 通过 yield from 语句的通道接收它，就像 fulture 直接从 fetch 中 yield 一样。当事件循环处理 fulture 时， task 将它的忽而过发送给 fetch，并且该值通过 read 接受，
 
 ## 协程协调
 
