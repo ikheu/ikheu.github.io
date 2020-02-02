@@ -717,9 +717,54 @@ Task(fetcher.fetch())
 loop()
 ```
 
-当 read 函数 yield 一个 future 时，task 通过 yield from 语句的通道接收它，就像 future 直接从 fetch 中 yield 一样。当事件循环处理 future 时，task 将它的忽而过发送给 fetch，并且该值通过 read 接受，
+当 read 函数 yield 一个 future 时，task 通过 yield from 语句的通道接收它，就像 future 从 fetch 中直接 yield 一样。当事件循环处理 future 时，task 将它的忽而过发送给 fetch，并且该值通过 read 接受，就像 task 被 read 直接驱动一样：
+
+
+为了完善的协程实现，我们弥补了一下缺陷：我们的代码在等待 future 时使用 yield，但在将其委托给子协程时使用 yield from。如果每当协程暂停时都使用 yield from，则会更加完善。这样，协程就不必关心它等待什么类型的东西。
+
+我们利用了 Python 在生成器和迭代器之间的深层对应特性。对于调用者而言，推进生成器与推进迭代器相同。因此，我们通过实现一种特殊的方法使 Future 类变得可迭代：
+
+```python
+    # Method on Future class.
+    def __iter__(self):
+        # Tell Task to resume me here.
+        yield self
+        return self.result
+```
+future 的 __iter__ 方法是一个 yield 自身的协程。我们将以下代码：
+
+```python
+# f is a Future.
+yield f
+```
+
+取代为：
+
+```python
+# f is a Future.
+yield from f
+```
+
+而外部其他部分不变！驱动者 Task 通过调用 send 接收 future，当 future 处理完后，它将新结果发送回协程。
+
+全部使用 yield from 的优点是什么？为什么比在等待 future 时使用 yield 以及在委托协程时使用 yield from 这种方式更好？那是因为现在方法的实现不会调用者的影响，可以自由更改。被调用方可能是一个返回 future （用于处理值）的常规方法，也可能是一个包含 yield from 语句并返回值的协程。不管哪种情况，调用方只需要 yield from 该方法并等待结果。
+
+对于异步用户来说，使用协程进行编码比在此处看到的要简单得多。在上面的代码中，我们从第一原则实现了协程，因此你看到了回调、tasks 和 futures。你甚至看到了非阻塞套接字和 select 调用。但是，当在使用 asyncio 构建应用程序时，这些都不会出现在代码中。如我们所承诺的，可以轻松获取URL：
+
+```python
+    @asyncio.coroutine
+    def fetch(self, url):
+        response = yield from self.session.get(url)
+        body = yield from response.read()
+```
+
+目前一切顺利，现在回到了最初的任务：使用 asyncio 编写一个异步 Web 爬虫。
 
 ## 协程协调
+
+我们在一开始描述了希望爬虫如何工作，现在可以用 asyncio 协程库来实现它了。
+
+爬虫程序将获取第一页，解析其链接，并将其添加到队列中。之后，它会散布在整个网站上，并发获取页面。但是为了限制客户端和服务器上的负载，我们希望运行一些最大的并发值。每当工作者完成获取页面时，都应立即从队列中拉出下一个链接。我们将经历没有足够工作要做的时期，因此一些工人必须停下来。 但是，当工作人员访问包含新链接的页面时，队列突然增加，任何暂停的工作人员都应醒来并开始破解。 最后，一旦完成工作，我们的程序必须退出。【【【】】】
 
 ## 结论
 
@@ -734,4 +779,3 @@ loop()
 尽管取得了这些进步，但核心思想仍然存在。 Python的新本机协程在语法上将与生成器不同，但工作方式非常相似。 实际上，他们将在Python解释器中共享一个实现。 任务，未来和事件循环将继续在异步中发挥作用。
 
 既然您知道了异步协程的工作原理，就可以在很大程度上忘记细节。 机器被塞在一个精巧的接口后面。 但是，您掌握了基础知识后，便可以在现代异步环境中正确有效地进行编码。
-
