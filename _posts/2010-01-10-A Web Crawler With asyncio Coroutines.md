@@ -766,7 +766,7 @@ yield from f
 
 爬虫程序将获取第一页，解析其链接，并将其添加到队列中。之后，它爬取整个网站，并发获取页面。但是为了降低客户端和服务器上的负载，我们限制最大并发数量。每当任务获取到页面后，都立即从队列中取出下一个链接。有一段时期程序没太多事可干，因此一些任务必须停下来。但当访问包含新链接的页面时，队列突然增加，暂停的工作人员会醒来并开始抓取网页。最后，一旦完成工作，程序必须退出。
 
-想象一下，如果工作者是线程，我们怎样编写爬虫？我们可以使用 Python 标准库中同步的 queue。每次将项目放入队列时，队列都会增加其 “tasks” 计数。线程在完成项目工作后调用 task_done。Queue.join上的主线程将阻塞，直到队列中的每个项目都被 task_done 调用匹配，然后退出。
+想象一下，如果工作者是线程，我们怎样编写爬虫？我们可以使用 Python 标准库中同步的 queue。每次将项目放入队列时，队列都会增加其 “tasks” 计数。线程在完成一项任务后调用 task_done。Queue.join上的主线程将阻塞，直到队列中的每一项都被 task_done 调用匹配，然后退出。
 
 协程使用与异步队列完全相同的模式！首先我们引入：
 
@@ -778,6 +778,21 @@ except ImportError:
     # merged into Queue.
     from asyncio import Queue
 ```
+
+我们在 crawler 类中 worker 的共享状态，并在 `crawl` 中编写主逻辑。我们从一个协程开始启动 crawl，并运行 asyncio 的事件循环，直到 crawl 结束。
+
+```python
+loop = asyncio.get_event_loop()
+
+crawler = crawling.Crawler('http://xkcd.com',
+                           max_redirect=10)
+
+loop.run_until_complete(crawler.crawl())
+```
+
+
+
+
 
 
 
