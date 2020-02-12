@@ -893,7 +893,7 @@ crawl 方法做了主协程必须做的所有事情：从队列中获取 URL，�
             self.q.task_done()
 ```
 
-Python 解释器看到代码中包含 yield from 语句时，会将其编译为生成器函数。所以在 crawl 中，当主协程调用 slef.work 10 次时，它并不会运行该方法，只会使用该段代码的引用创建 10 个生成器对象。它将每个包装在一个 Task 中。Task 接收生成器 yield 的每个 future，并通过调用 send 并传递每个 future 处理后的结果来驱动生成器。由于生成器有各自的栈帧，所以他们使用独立的局部变量和指令指针来独立运行。
+Python 解释器看到代码中包含 yield from 语句时，会将其编译为生成器函数。所以在 crawl 中，当主协程调用 slef.work 10 次时，它并不会运行该方法，只会使用该段代码的引用创建 10 个生成器对象。它将每个包装在一个 Task 中。Task 接收生成器 yield 的每个 future，通过调用 send 并传递每个 future 处理后的结果来驱动生成器。由于生成器有各自的栈帧，所以他们使用独立的局部变量和指令指针来独立运行。
 
 worker 之间通过队列来协调。通过下面这句来获取新链接：
 
@@ -903,15 +903,170 @@ worker 之间通过队列来协调。通过下面这句来获取新链接：
 
 队列的 get 方法本身就是一个协程：它将元素放入队列之前暂停，然后恢复运行并返回该元素。
 
-顺便一提，当主协程取消时，worker 会在 crawl 结束的地方暂停
+顺便一提，当主协程取消时，worker 会在 crawl 结束的地方暂停。从协程的角度来看，当 yield from 抛出 CancelledError 时，他在循环的最后行程结束。
 
+当 worker 获取页面时，它将解析链接并塞入队列，然后调用 task_done 减少计数器。最终，一个 worker 获取到了其包含的所有 URL 都已经获取过的页面，并且队列中不再有任务。因此该 worker 对 task_done 的调用将计数器减少到 0。然后等待队列的 join 方法的 crawl 结束运行。
 
+我们承诺过要解释为什么队列中的元素是成对的，例如：
+
+```
+# URL to fetch, and the number of redirects left.
+('http://xkcd.com/353', 10)
+```
+
+新的URL剩余 10 次重定向。提取此特定的 URL 会导致重定向到带有斜杠的新位置。我们减少剩余的重定向次数，并将下一个位置放入队列：
+
+```
+# URL with a trailing slash. Nine redirects left.
+('http://xkcd.com/353/', 9)
+```
+
+我们使用的 aiohttp 库，在默认情况下使用重定向，并提供最终的响应。但我们不用这种默认行为，而将重定向交给爬虫程序处理，这样就可以合并相同的目标地址：如果 URL 已经在 self.seen_urls 中了，并且在别的入口点已经开始抓取该链接：
+
+爬虫程序获取 “foo”，并发现它重定向到 “baz”，因此将 “baz” 添加到队列和 seen_urls 中。如果获取的下一页是 “bar” 也重定向到 “baz”，则程序不会再次将 “baz” 塞入队列。如果响应是页面而不是重定向，fetch 则对其进行解析以获取链接并将新链接放入队列。
+
+```python
+    @asyncio.coroutine
+    def fetch(self, url, max_redirect):
+        # Handle redirects ourselves.
+        response = yield from self.session.get(
+            url, allow_redirects=False)
+
+        try:
+            if is_redirect(response):
+                if max_redirect > 0:
+                    next_url = response.headers['location']
+                    if next_url in self.seen_urls:
+                        # We have been down this path before.
+                        return
+
+                    # Remember we have seen this URL.
+                    self.seen_urls.add(next_url)
+
+                    # Follow the redirect. One less redirect remains.
+                    self.q.put_nowait((next_url, max_redirect - 1))
+             else:
+                 links = yield from self.parse_links(response)
+                 # Python set-logic:
+                 for link in links.difference(self.seen_urls):
+                    self.q.put_nowait((link, self.max_redirect))
+                self.seen_urls.update(links)
+        finally:
+            # Return connection to pool.
+            yield from response.release()
+```
+
+如果这是多线程代码，则在竞争条件下会很糟糕。例如，worker 检查链接是否在 seen_urls 中，如果不在，则将其放入队列并添加到 seen_urls中。如果在两个操作间产生中断，则另一个 worker 可能会从不同的页面解析相同的链接，同样在发现它不在see_urls 中时，会将其添加到队列中。现在，同一链接放入队列两次，从而（最好情况下）导致重复的工作和错误的统计信息。
+
+但是，协程仅容易受 yield from 语句的干扰。这个关键区别，使协程代码比多线程代码更不容易出现竞争：多线程代码必须通过获取锁来显式地进入临界区，否则将被中断。默认情况下，Python 协程是不可中断的，只有在显式地 yield 时才会让出控制权。
+
+我们不再需要像基于回调的程序中那样的 fetcher 类。该类是减少回调的一种解决方法：在等待 I/O 时，由于局部变量不会在调用之间保留，它们需要一些位置来存储状态。然而，fetcher 协程可以像常规函数一样将其状态存储在局部变量中，因此不再需要这种类。
+
+fetch 处理完服务器响应后，将返回到调用方 work。work 方法调用队列的 task_done，然后从队列中获取下一个要提取的 URL。
+
+当 fetch 将新的链接放入队列时，它将增加未完成任务的数量，并使等待 q.join 的主协程暂停。但是，如果没有看不见的链接，并且这是队列中的最后一个 URL，那么当 work 调用 task_done 时，未完成的任务的数量将降至零。该事件将使 join 暂停并且主协程完成。
+
+当访存将新的链接放入队列时，它将增加未完成任务的数量，并使等待q.join的主协程暂停。 但是，如果没有看不见的链接，并且这是队列中的最后一个URL，那么当工作调用task_done时，未完成的任务的数量将降至零。 该事件将使连接暂停并且主要协程完成。
+
+协调 work 与 主协程的队列代码如下：
+
+```python
+class Queue:
+    def __init__(self):
+        self._join_future = Future()
+        self._unfinished_tasks = 0
+        # ... other initialization ...
+
+    def put_nowait(self, item):
+        self._unfinished_tasks += 1
+        # ... store the item ...
+
+    def task_done(self):
+        self._unfinished_tasks -= 1
+        if self._unfinished_tasks == 0:
+            self._join_future.set_result(None)
+
+    @asyncio.coroutine
+    def join(self):
+        if self._unfinished_tasks > 0:
+            yield from self._join_future
+```
+
+主协程 crawl 被 join 所 yield。因此，当最后一个 worker 将未完成的任务计数减为零时，表示 crawl 恢复并完成了工作。
+
+```python
+loop.run_until_complete(self.crawler.crawl())
+```
+
+程序如何结束？由于 crawl 是生成器函数，因此对其进行调用将返回生成器。为了驱动生成器，asyncio 将其包装在一个 task 中：
+
+```python
+class EventLoop:
+    def run_until_complete(self, coro):
+        """Run until the coroutine is done."""
+        task = Task(coro)
+        task.add_done_callback(stop_callback)
+        try:
+            self.run_forever()
+        except StopError:
+            pass
+
+class StopError(BaseException):
+    """Raised to stop the event loop."""
+
+def stop_callback(future):
+    raise StopError
+```
+
+task 完成后将抛出 StopError，循环将 StopError 视作已正常完成的信号。
+
+task 的 add_done_callback 和 restult 方法又是什么？你或许认为 task 类似于 future。你的直觉是对的。我们必须承认隐藏的 Task 类的细节：一个 task 也是一个 future。
+
+```python
+class Task(Future):
+    """A coroutine wrapped in a Future."""
+```
+
+通常，future 可以通过某个地方调用 set_result 来处理。但是，当协程停止时，task 会自行处理。请记住，从我们之前对 Python 生成器的探索中可以知道，当生成器返回时，它会抛出特殊的 StopIteration 异常。
+
+```python
+    # Method of class Task.
+    def step(self, future):
+        try:
+            next_future = self.coro.send(future.result)
+        except CancelledError:
+            self.cancelled = True
+            return
+        except StopIteration as exc:
+
+            # Task resolves itself with coro's return
+            # value.
+            self.set_result(exc.value)
+            return
+
+        next_future.add_done_callback(self.step)
+```
+
+因此，当事件循环调用 task.add_done_callback（stop_callback）时，它准备被 task 停止。这里再次是 run_until_complete：
+
+```python
+    # Method of event loop.
+    def run_until_complete(self, coro):
+        task = Task(coro)
+        task.add_done_callback(stop_callback)
+        try:
+            self.run_forever()
+        except StopError:
+            pass
+```
+
+当 task 捕获 StopIteration 并自行处理时，回调将从循环内引发 StopError。循环停止，调用堆栈退回到 run_until_complete。我们的程序完成了。
 
 ## 结论
 
 现代程序越来越经常受 I/O 约束，而不是受 CPU 约束。对于这样的程序，Python 线程是个两头吃亏的选择：全局解释器锁阻止它们真实的并行计算，而抢占式切换使它们易于发生竞争。异步通常是正确的模式。但是随着基于回调的异步代码的增长，它往往会变得混乱不堪。协程是一个整洁的选择。它们自然地包含在子例程中，并具有健全的异常处理和堆栈跟踪功能。
 
-如果我们斜视以使语句的收益模糊，那么协程看起来就像是执行传统阻塞I / O的线程。 我们甚至可以将协程与来自多线程编程的经典模式进行协调。 无需重新发明。 因此，与回调相比，协程对于使用多线程的程序员是一个诱人的习惯用法。
+如果我们斜视以使语句的收益模糊，那么协程看起来就像是执行传统阻塞 I/O 的线程。 我们甚至可以将协程与来自多线程编程的经典模式进行协调。 无需重新发明。 因此，与回调相比，协程对于使用多线程的程序员是一个诱人的习惯用法。
 
 但是，当我们睁开眼睛，专注于语句的收益时，我们看到它们在协程让步并允许其他人运行时标记了点。 与线程不同，协程会显示我们的代码可以在何处中断和无法在何处中断。 格里夫·莱夫科维茨（Glyph Lefkowitz）在他的启发性文章“坚强” 14中写道：“线程使本地推理变得困难，本地推理可能是软件开发中最重要的事情。” 但是，显式屈服可以“通过检查例程本身而不是整个系统来了解例程的行为（从而，正确性）”。
 
