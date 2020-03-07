@@ -18,6 +18,7 @@ body {
   font-size: 16px;
   line-height: 1.5;
   color: $text-color;
+  text-align: justify;
   // background-color: $background-color;
   -webkit-text-size-adjust: 100%;
   -webkit-font-feature-settings: "kern" 1;
@@ -134,7 +135,7 @@ blockquote {
   color: $grey-color;
   border-left: 4px solid $grey-color-light;
   padding-left: $spacing-unit / 2;
-  @include relative-font-size(1.125);
+  @include relative-font-size(1);
   letter-spacing: -1px;
   font-style: italic;
 
@@ -142,8 +143,6 @@ blockquote {
     margin-bottom: 0;
   }
 }
-
-
 
 /**
  * Code formatting
