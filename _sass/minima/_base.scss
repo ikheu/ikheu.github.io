@@ -6,7 +6,6 @@ p, blockquote, pre, hr,
 dl, dd, ol, ul, figure {
   margin: 0;
   padding: 0;
-
 }
 
 
@@ -15,9 +14,11 @@ dl, dd, ol, ul, figure {
  * Basic styling
  */
 body {
-  font: $base-font-weight #{$base-font-size}/#{$base-line-height} $base-font-family;
+  font-family: $base-font-family;
+  font-size: 16px;
+  line-height: 1.5;
   color: $text-color;
-  background-color: $background-color;
+  // background-color: $background-color;
   -webkit-text-size-adjust: 100%;
   -webkit-font-feature-settings: "kern" 1;
      -moz-font-feature-settings: "kern" 1;
@@ -95,7 +96,7 @@ li {
  * Headings
  */
 h1, h2, h3, h4, h5, h6 {
-  font-weight: $base-font-weight;
+  font-weight: 600;
 }
 
 
@@ -149,21 +150,25 @@ blockquote {
  */
 pre,
 code {
-  @include relative-font-size(0.9375);
   border: 1px solid $grey-color-light;
   border-radius: 3px;
-  background-color: #eef;
+  background-color: #f6f8fa;
 }
 
 code {
+  
   padding: 1px 5px;
+  font-size: 85%;
+  font-family: SFMono-Regular,Consolas,Liberation Mono,Menlo,monospace;
 }
 
 pre {
-  padding: 8px 12px;
+  
+  padding: 16px;
   overflow-x: auto;
 
   > code {
+    
     border: 0;
     padding-right: 0;
     padding-left: 0;
