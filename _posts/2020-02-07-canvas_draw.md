@@ -18,7 +18,7 @@ tags: Python
 demo见：[drawing_board](https://github.com/ikheu/frontend/blob/master/drawing_board/index.html)
 。最后的效果长这样：
 
-![](/assets/img/demo.png){:width="300px"}
+![](/assets/img/canvas.png){:width="300px"}
 
 所有的实现以及遇到的问题，都可以在网上找到。这里做一个总结。
 
