@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  Redis 中的数据结构与数据对象
+title:  Redis 中的数据结构
 categories: 数据库
 tags: Redis
 ---
