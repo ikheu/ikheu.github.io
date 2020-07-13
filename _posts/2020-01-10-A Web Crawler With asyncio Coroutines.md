@@ -760,11 +760,11 @@ yield f
 yield from f
 ```
 
-而外部其他部分不变！驱动者 `task` 通过调用 `send` 接收 future，当 future 处理完后，它将新结果发送回协程。
+而外部其他部分不变！驱动者 Task 通过调用 `send` 接收 future，当 future 处理完后，它将新结果发送回协程。
 
-全部使用 yield from 的优点是什么？为什么比在等待 future 时使用 yield 以及在委托协程时使用 yield from 这种方式更好？那是因为现在方法的实现不会调用者的影响，可以自由更改。被调用方可能是一个返回 future （用于处理值）的常规方法，也可能是一个包含 yield from 语句并返回值的协程。不管哪种情况，调用方只需要 yield from 该方法并等待结果。
+全部使用 `yield from` 有什么好处？为什么比在等待 future 时使用 `yield` 以及在委托协程时使用 `yield from` 这种方式更好？那是因为现在方法的实现不会受调用者的影响，可以自由更改：调用方可能是一个返回 future （用于处理值）的常规方法，也可能是一个包含 `yield from` 语句并返回值的协程。不管哪种情况，调用方只需要 `yield from` 该方法并等待结果。
 
-对于异步用户来说，使用协程进行编码比在此处看到的要简单得多。在上面的代码中，我们从第一原则实现了协程，因此你看到了回调、tasks 和 futures。你甚至看到了非阻塞套接字和 select 调用。但是，当在使用 asyncio 构建应用程序时，这些都不会出现在代码中。如我们所承诺的，可以轻松获取URL：
+对于异步用户来说，使用协程进行编码比在此处看到的要简单得多。在上面的代码中，我们从第一原则实现了协程，因此你看到了回调、tasks 和 futures。你甚至看到了非阻塞套接字和 `select` 调用。但是，在使用 asyncio 构建应用程序时，这些都不会出现在代码中。如我们所承诺的，可以轻松抓取 URL：
 
 ```python
     @asyncio.coroutine
@@ -779,9 +779,9 @@ yield from f
 
 我们在一开始描述了希望爬虫如何工作，现在可以用 asyncio 协程库来实现它了。
 
-爬虫程序将获取第一页，解析其链接，并将其添加到队列中。之后，它爬取整个网站，并发获取页面。但是为了降低客户端和服务器上的负载，我们限制最大并发数量。每当任务获取到页面后，都立即从队列中取出下一个链接。有一段时期程序没太多事可干，因此一些任务必须停下来。但当访问包含新链接的页面时，队列突然增加，暂停的工作人员会醒来并开始抓取网页。最后，一旦完成工作，程序必须退出。
+爬虫程序将获取第一页，解析其链接，并将其添加到队列中。之后，它爬取整个网站，并发获取页面。但是为了降低客户端和服务器上的负载，我们限制最大的 worker 数量。每当一个 worker 获取到页面后，都立即从队列中取出下一个链接。有一段时期程序没太多事可干，因此一些 worker 必须停下来。但当访问包含新链接的页面时，队列突然增加，暂停的 worker 会醒来并开始抓取网页。最后，一旦完成工作，程序必须退出。
 
-想象一下，如果工作者是线程，我们怎样编写爬虫？我们可以使用 Python 标准库中同步的 queue。每次将项目放入队列时，队列都会增加其 “tasks” 计数。线程在完成一项任务后调用 task_done。Queue.join上的主线程将阻塞，直到队列中的每一项都被 task_done 调用匹配，然后退出。
+想象一下，如果 worker 是线程，我们怎样编写爬虫？我们可以使用 Python 标准库中同步的 queue。每次将项目放入队列时，队列都会增加其 “tasks” 计数。线程 worker 在完成一项任务后调用 `task_done`。 主线程在 `Queue.join` 处阻塞，直到队列中的每一项都被 `task_done` 调用匹配，然后退出。
 
 协程使用与异步队列完全相同的模式！首先我们引入：
 
@@ -794,7 +794,7 @@ except ImportError:
     from asyncio import Queue
 ```
 
-我们在 crawler 类中 worker 的共享状态，并在 `crawl` 中编写主逻辑。我们从一个协程开始启动 crawl，并运行 asyncio 的事件循环，直到 crawl 结束。
+我们在 crawler 类中 worker 们的共享状态，并在 `crawl` 中编写主逻辑。我们从一个协程开始启动 `crawl`，并运行 asyncio 的事件循环，直到 `crawl` 结束。
 
 ```python
 loop = asyncio.get_event_loop()
@@ -805,7 +805,7 @@ crawler = crawling.Crawler('http://xkcd.com',
 loop.run_until_complete(crawler.crawl())
 ```
 
-爬虫从一个根 URL 和 max_redirect 开始，max_redirect 是为获取任一个链接的最大重定向次数。它将 (URL, nax_redirect) 对放入队列中。（下文将解释原因）
+爬虫从一个根 URL 和 `max_redirect` 开始，`max_redirect` 是为获取任一个链接的最大重定向次数。它将 (URL, max_redirect) 对放入队列中（下文将解释原因）。
 
 ```python
 class Crawler:
@@ -823,13 +823,13 @@ class Crawler:
         self.q.put((root_url, self.max_redirect))
 ```
 
-队列中未完成的 tasks 的数量现在是 1。回到主程序中，启用事件循环和 crawl 方法：
+队列中未完成的 tasks 的数量现在是 1。回到主程序中，启用事件循环和 `crawl` 方法：
 
 ```python
 loop.run_until_complete(crawler.crawl())
 ```
 
-crawl 协程启动了 workers。它就像一个主线程：所有 tasks 完成前在 join 处阻塞住，而 workers 在后台运行。
+`crawl` 协程启动了 workers。它就像一个主线程：所有 tasks 完成前在 `join` 处阻塞住，而 workers 在后台运行。
 
 ```python
     @asyncio.coroutine
@@ -846,13 +846,13 @@ crawl 协程启动了 workers。它就像一个主线程：所有 tasks 完成�
 
 如果 workers 是线程，那么我们不会一次全部启动。为了避免线程创建开销，线程池通常按需增长。但协程开销很小，只需要设置最大数量即可。
 
-有趣的是，我们该怎么关闭哦爬虫。当 join future resolves，worker tasks 仍处于活动状态单已暂停：它们等待更多 URL，但不会出现。因此主协程在退出前将其取消。不然 Python 解释器关闭并调用所有对象的销毁器时，活动的 task 将抗议：
+有趣的是，我们该怎么关闭哦爬虫。当 `join` future 完成后，worker task 们仍处于活动状态但已暂停：它们等待更多 URL，但不会再出现。因此主协程在退出前将它们取消。不然 Python 解释器关闭并调用所有对象的销毁器时，活动的 task 们将抗议：
 
 ```
 ERROR:asyncio:Task was destroyed but it is pending!
 ```
 
-cancel 如何工作呢？生成器还有我们尚未展示的功能。你可以从外部想向生成器中抛出异常：
+`cancel` 如何工作呢？生成器还有我们尚未展示的功能。你可以从外部向生成器中抛出异常：
 
 ```
 >>> gen = gen_fn()
@@ -865,7 +865,7 @@ Traceback (most recent call last):
 Exception: error
 ```
 
-生成器通过 throw 来抛出，但现在却引发了异常。若生成器的调用栈中未捕获该异常，则异常会冒泡到顶部。因此要取消 task 的协程：
+生成器通过 `throw` 来恢复，但现在却引发了异常。若生成器的调用栈中未捕获该异常，则异常会冒泡到顶部。因此要取消 task 的协程：
 
 ```python
     # Method of Task class.
@@ -873,7 +873,7 @@ Exception: error
         self.coro.throw(CancelledError)
 ```
 
-无论生成器在哪里暂停，或者处于 yield from 语句，他都将恢复或抛出异常。我们通过 task 的 step 方法来处理取消：
+无论生成器在哪里暂停，或者处于 `yield from` 语句，它都将恢复并抛出异常。我们通过 task 的 `step` 方法来处理取消：
 
 ```python
     # Method of Task class.
@@ -889,13 +889,15 @@ Exception: error
         next_future.add_done_callback(self.step)
 ```
 
-现在 task 知道它已被取消，因此当它被销毁时，不再惧怕死亡。一旦 crawl 取消了 workers，它便会退出。事件循环看到协程完成，也会退出。
+现在 task 知道它已被取消，因此当它被销毁时，不再惧怕死亡。
+
+一旦 `crawl` 取消了 workers，它便会退出。事件循环看到协程完成，也会退出。
 
 ```python
 loop.run_until_complete(crawler.crawl())
 ```
 
-crawl 方法做了主协程必须做的所有事情：从队列中获取 URL，爬取并解析新的链接。每个 worker 独立运行 work 协程：
+`crawl` 方法做了主协程必须做的所有事情：从队列中获取 URL，爬取并解析新的链接。每个 worker 独立运行 `work` 协程：
 
 ```python
     @asyncio.coroutine
@@ -908,37 +910,39 @@ crawl 方法做了主协程必须做的所有事情：从队列中获取 URL，�
             self.q.task_done()
 ```
 
-Python 解释器看到代码中包含 yield from 语句时，会将其编译为生成器函数。所以在 crawl 中，当主协程调用 slef.work 10 次时，它并不会运行该方法，只会使用该段代码的引用创建 10 个生成器对象。它将每个包装在一个 Task 中。Task 接收生成器 yield 的每个 future，通过调用 send 并传递每个 future 处理后的结果来驱动生成器。由于生成器有各自的栈帧，所以他们使用独立的局部变量和指令指针来独立运行。
+Python 解释器看到代码中包含 `yield from` 语句时，会将其编译为生成器函数。所以在 `crawl` 中，当主协程调用 slef.work 10 次时，它并不会运行该方法，只会使用该段代码的引用创建 10 个生成器对象。它将每个包装在一个 Task 中。Task 接收生成器产出的每个 future，通过调用 `send` 并传递每个 future 处理后的结果来驱动生成器。由于生成器有各自的栈帧，所以它们使用独立的局部变量和指令指针来独立运行。
 
-worker 之间通过队列来协调。通过下面这句来获取新链接：
+worker 们之间通过队列来协调。通过下面这句来获取新链接：
 
 ```python
     url, max_redirect = yield from self.q.get()
 ```
 
-队列的 get 方法本身就是一个协程：它将元素放入队列之前暂停，然后恢复运行并返回该元素。
+队列的 `get` 方法本身就是一个协程：它在元素放入队列之前暂停，然后恢复运行并返回该元素。
 
-顺便一提，当主协程取消时，worker 会在 crawl 结束的地方暂停。从协程的角度来看，当 yield from 抛出 CancelledError 时，他在循环的最后行程结束。
+顺便一提，当主协程取消时，worker 会在 crawl 结束的地方暂停。从协程的角度来看，当 `yield from` 抛出 `CancelledError` 时，它在循环的最后行程结束。
 
-当 worker 获取页面时，它将解析链接并塞入队列，然后调用 task_done 减少计数器。最终，一个 worker 获取到了其包含的所有 URL 都已经获取过的页面，并且队列中不再有任务。因此该 worker 对 task_done 的调用将计数器减少到 0。然后等待队列的 join 方法的 crawl 结束运行。
+当 worker 获取页面时，它将解析链接并塞入队列，然后调用 `task_done` 减少计数器。最终，一个 worker 获取到了其包含的所有 URL 都已经获取过的页面，并且队列中不再有任务。因此该 worker 对 `task_done` 的调用将计数器减少到 0。然后等待队列 `join` 方法的 crawl 结束运行。
 
-我们承诺过要解释为什么队列中的元素是成对的，例如：
+我们说过要解释为什么队列中的元素是成对的，例如：
 
 ```
 # URL to fetch, and the number of redirects left.
 ('http://xkcd.com/353', 10)
 ```
 
-新的URL剩余 10 次重定向。提取此特定的 URL 会导致重定向到带有斜杠的新位置。我们减少剩余的重定向次数，并将下一个位置放入队列：
+新的 URL 剩余 10 次重定向。提取此特定的 URL 会导致重定向到带有斜杠的新位置。我们减少剩余的重定向次数，并将下一个位置放入队列：
 
 ```
 # URL with a trailing slash. Nine redirects left.
 ('http://xkcd.com/353/', 9)
 ```
 
-我们使用的 aiohttp 库，在默认情况下使用重定向，并提供最终的响应。但我们不用这种默认行为，而将重定向交给爬虫程序处理，这样就可以合并相同的目标地址：如果 URL 已经在 self.seen_urls 中了，并且在别的入口点已经开始抓取该链接：
+我们使用的 `aiohttp` 库，在默认情况下使用重定向，并提供最终的响应。但我们不用这种默认行为，而将重定向交给爬虫程序处理，这样就可以合并相同的目标地址：如果 URL 已经在 `self.seen_urls` 中了，并且在别的入口点已经开始抓取该链接：
 
-爬虫程序获取 “foo”，并发现它重定向到 “baz”，因此将 “baz” 添加到队列和 seen_urls 中。如果获取的下一页是 “bar” 也重定向到 “baz”，则程序不会再次将 “baz” 塞入队列。如果响应是页面而不是重定向，fetch 则对其进行解析以获取链接并将新链接放入队列。
+![图 5.4 - 重定向](/assets/img/redirects.png){:width="300px"}
+
+爬虫程序获取 “foo”，并发现它重定向到 “baz”，因此将 “baz” 添加到队列和 `seen_urls` 中。如果获取的下一页是 “bar” 也重定向到 “baz”，则程序不会再次将 “baz” 塞入队列。如果响应是页面而不是重定向，`fetch` 则对其进行解析以获取链接并将新链接放入队列。
 
 ```python
     @asyncio.coroutine
@@ -971,19 +975,17 @@ worker 之间通过队列来协调。通过下面这句来获取新链接：
             yield from response.release()
 ```
 
-如果这是多线程代码，则在竞争条件下会很糟糕。例如，worker 检查链接是否在 seen_urls 中，如果不在，则将其放入队列并添加到 seen_urls中。如果在两个操作间产生中断，则另一个 worker 可能会从不同的页面解析相同的链接，同样在发现它不在see_urls 中时，会将其添加到队列中。现在，同一链接放入队列两次，从而（最好情况下）导致重复的工作和错误的统计信息。
+如果这是多线程代码，则在竞争条件下会很糟糕。例如，worker 检查链接是否在 `seen_urls` 中，如果不在，则将其放入队列并添加到 `seen_urls` 中。如果在两个操作间产生中断，则另一个 worker 可能会从不同的页面解析相同的链接，同样在发现它不在 `see_urls` 中时，会将其添加到队列中。现在，同一链接放入队列两次，从而（最好情况下）导致重复的工作和错误的统计信息。
 
-但是，协程仅容易受 yield from 语句的干扰。这个关键区别，使协程代码比多线程代码更不容易出现竞争：多线程代码必须通过获取锁来显式地进入临界区，否则将被中断。默认情况下，Python 协程是不可中断的，只有在显式地 yield 时才会让出控制权。
+但是，协程仅会被 `yield from` 语句打断。这个关键区别，使协程代码比多线程代码更不容易出现竞争：多线程代码必须通过获取锁来显式地进入临界区，否则将被中断。默认情况下，Python 协程是不可中断的，只有在显式地 yield 时才会让出控制权。
 
 我们不再需要像基于回调的程序中那样的 fetcher 类。该类是减少回调的一种解决方法：在等待 I/O 时，由于局部变量不会在调用之间保留，它们需要一些位置来存储状态。然而，fetcher 协程可以像常规函数一样将其状态存储在局部变量中，因此不再需要这种类。
 
-fetch 处理完服务器响应后，将返回到调用方 work。work 方法调用队列的 task_done，然后从队列中获取下一个要提取的 URL。
+`fetch` 处理完服务器响应后，将返回到调用方 `work`。`work` 方法调用队列的 `task_done`，然后从队列中获取下一个要提取的 URL。
 
-当 fetch 将新的链接放入队列时，它将增加未完成任务的数量，并使等待 q.join 的主协程暂停。但是，如果没有看不见的链接，并且这是队列中的最后一个 URL，那么当 work 调用 task_done 时，未完成的任务的数量将降至零。该事件将使 join 暂停并且主协程完成。
+`fetch` 将新的链接放入队列后，它将增加未完成 task 的数量，并使等待 `q.join` 的主协程暂停。但是，如果没有看不见的链接，并且这是队列中的最后一个 URL，那么当 work 调用 task_done 时，未完成的任务的数量将降至零。该事件将使 join 恢复并且主协程完成。
 
-当访存将新的链接放入队列时，它将增加未完成任务的数量，并使等待q.join的主协程暂停。 但是，如果没有看不见的链接，并且这是队列中的最后一个URL，那么当工作调用task_done时，未完成的任务的数量将降至零。 该事件将使连接暂停并且主要协程完成。
-
-协调 work 与 主协程的队列代码如下：
+协调 workers 与 主协程的队列的代码如下：
 
 ```python
 class Queue:
@@ -1007,13 +1009,15 @@ class Queue:
             yield from self._join_future
 ```
 
-主协程 crawl 被 join 所 yield。因此，当最后一个 worker 将未完成的任务计数减为零时，表示 crawl 恢复并完成了工作。
+主协程 `crawl` 被 `join` 所 yield。因此，当最后一个 worker 将未完成的任务计数减为零时，表示 `crawl` 恢复并完成了工作。
+
+旅程快结束了。我们的程序从调用 `crawl` 开始：
 
 ```python
 loop.run_until_complete(self.crawler.crawl())
 ```
 
-程序如何结束？由于 crawl 是生成器函数，因此对其进行调用将返回生成器。为了驱动生成器，asyncio 将其包装在一个 task 中：
+程序如何结束？由于 `crawl` 是生成器函数，因此对其进行调用将返回生成器。为了驱动生成器，asyncio 将其包装在一个 task 中：
 
 ```python
 class EventLoop:
@@ -1033,16 +1037,16 @@ def stop_callback(future):
     raise StopError
 ```
 
-task 完成后将抛出 StopError，循环将 StopError 视作已正常完成的信号。
+task 完成后将抛出 `StopError`，循环将 `StopError` 视作已正常完成的信号。
 
-task 的 add_done_callback 和 restult 方法又是什么？你或许认为 task 类似于 future。你的直觉是对的。我们必须承认隐藏的 Task 类的细节：一个 task 也是一个 future。
+task 的 `add_done_callback` 和 `restult` 方法又是什么？你或许认为 task 类似于 future。你的直觉是对的。我们必须承认隐藏的 Task 类的细节：一个 task 也是一个 future。
 
 ```python
 class Task(Future):
     """A coroutine wrapped in a Future."""
 ```
 
-通常，future 可以通过某个地方调用 set_result 来处理。但是，当协程停止时，task 会自行处理。请记住，从我们之前对 Python 生成器的探索中可以知道，当生成器返回时，它会抛出特殊的 StopIteration 异常。
+通常，future 可以通过某个地方调用 `set_result` 来处理。但是，当协程停止时，task 会自行处理。请记住，从我们之前对 Python 生成器的探索中可以知道，当生成器返回时，它会抛出特殊的 `StopIteration` 异常。
 
 ```python
     # Method of class Task.
@@ -1062,7 +1066,7 @@ class Task(Future):
         next_future.add_done_callback(self.step)
 ```
 
-因此，当事件循环调用 task.add_done_callback（stop_callback）时，它准备被 task 停止。这里再次是 run_until_complete：
+因此，当事件循环调用 `task.add_done_callback（stop_callback）` 时，它准备被 task 停止。这里再次是 `run_until_complete`：
 
 ```python
     # Method of event loop.
@@ -1075,18 +1079,18 @@ class Task(Future):
             pass
 ```
 
-当 task 捕获 StopIteration 并自行处理时，回调将从循环内引发 StopError。循环停止，调用堆栈退回到 run_until_complete。我们的程序完成了。
+当 task 捕获 `StopIteration` 并自行处理时，回调将从循环内引发 `StopError`。循环停止，调用堆栈退回到 `run_until_complete`。我们的程序完成了。
 
 ## 结论
 
 现代程序越来越经常受 I/O 约束，而不是受 CPU 约束。对于这样的程序，Python 线程是个两头吃亏的选择：全局解释器锁阻止它们真实的并行计算，而抢占式切换使它们易于发生竞争。异步通常是正确的模式。但是随着基于回调的异步代码的增长，它往往会变得混乱不堪。协程是一个整洁的选择。它们自然地包含在子例程中，并具有健全的异常处理和堆栈跟踪功能。
 
-如果我们斜视以使语句的收益模糊，那么协程看起来就像是执行传统阻塞 I/O 的线程。 我们甚至可以将协程与来自多线程编程的经典模式进行协调。 无需重新发明。 因此，与回调相比，协程对于使用多线程的程序员是一个诱人的习惯用法。
+如果我们无视 `yield from` 语句，那么协程看起来就像是执行传统阻塞 I/O 的线程。我们甚至可以将协程与多线程编程的经典模式进行协调。这里没有任何重新发明。因此，与回调相比，协程对于使用多线程的程序员是一个诱人的选择。
 
-但是，当我们睁开眼睛，专注于语句的收益时，我们看到它们在协程让步并允许其他人运行时标记了点。 与线程不同，协程会显示我们的代码可以在何处中断和无法在何处中断。 格里夫·莱夫科维茨（Glyph Lefkowitz）在他的启发性文章“坚强” 14中写道：“线程使本地推理变得困难，本地推理可能是软件开发中最重要的事情。” 但是，显式屈服可以“通过检查例程本身而不是整个系统来了解例程的行为（从而，正确性）”。
+但是，专注于 `yield from` 语句时，我们看到它们在协程让步并允许其他人运行时标记了点。与线程不同，协程会显示我们的代码可以在何处中断和无法在何处中断。Glyph Lefkowitz 在他的启发性文章 “Unyielding” 中写道：“线程使本地推理变得困难，而本地推理可能是软件开发中最重要的事情。” 但是，显式让步可以“通过检查例程本身而不是整个系统来了解例程的行为”。
 
-本章是在Python和异步技术的复兴中撰写的。 您刚刚学会了设计的基于生成器的协程，已于2014年3月在Python 3.4的“异步”模块中发布。2015年9月，Python 3.5随语言本身内置的协程一起发布。 这些本机协程以新语法“ async def”声明，而不是“ yield from”，而是使用新的“ await”关键字委派给协程或等待Future。
+本章是在 Python 和异步技术历史的复兴阶段撰写的。你刚刚所学会的基于生成器的协程，已于 2014 年 3 月在 Python 3.4 的“异步”模块中发布。2015 年 9 月，Python 3.5 将协程内置到语言中。这些本机协程以新语法 “async def” 声明，不再使用 “yield from”，而使用新的 “await” 关键字委派给协程或等待 Future。
 
-尽管取得了这些进步，但核心思想仍然存在。 Python的新本机协程在语法上将与生成器不同，但工作方式非常相似。 实际上，他们将在Python解释器中共享一个实现。 任务，未来和事件循环将继续在异步中发挥作用。
+尽管取得了这些进步，但核心思想仍然不变。Python 新的本机协程在语法上将与生成器不同，但工作方式非常相似。实际上，它们将在 Python 解释器中共享一个实现。Task，Future和事件循环将继续在异步中发挥作用。
 
-既然您知道了异步协程的工作原理，就可以在很大程度上忘记细节。 机器被塞在一个精巧的接口后面。 但是，您掌握了基础知识后，便可以在现代异步环境中正确有效地进行编码。
+既然你知道了异步协程的工作原理，就可以在很大程度上忘记细节。机制被精巧的接口掩盖。但是，掌握这些基础知识后，你便可以在现代异步环境中正确有效地进行编程。
