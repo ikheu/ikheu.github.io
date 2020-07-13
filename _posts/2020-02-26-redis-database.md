@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  Redis 中的数据结构与数据对象
+title:  Redis 中的数据结构
 categories: 数据库
 tags: Redis
 ---
@@ -21,7 +21,7 @@ struct sdshdr {
     int free;
     // 保存字符串值的数组
     char buf[];
-};
+}
 ```
 
 buf 以字节进行存储，因此除了存储文本数据外，还可以用于存储图像等二进制数据。为了兼容 C 中的字符串 API，buf 遵循了以 \0 结尾。每次修改 buf 数组时都会记录最新的 len 属性，因此能以 O(1) 复杂度获取字符串长度，而不用遍历整个字符串。
@@ -37,7 +37,7 @@ SDS 的动态性体现在 buf 的动态伸缩上。在进行字符串增长操�
 
 链表是一种基本的数据结构，它的每个节点存储了相邻节点的链接，因此可以进行高效的节点增删操作。据不同的实现，链表可能是单向的、双向的或者环形的等。Redis 中链表节点、链表的结构如下：
 
-```
+```c
 typedef struct listNode {
     // 前置节点
     struct listNode * prev;
@@ -46,8 +46,6 @@ typedef struct listNode {
     // 节点的值
     void * value;
 } listNode;
-
-
 ```
 
 用途：
@@ -111,11 +109,6 @@ previous_entry_length 所占的字节数与前一个节点的长度有关。删�
 用途：
 - 
 - 
-
-## 启发
-
-1. 分层设计
-2. 性能优化
 
 ## 参考
 1. [Redis 设计与实现](http://redisbook.com/)
