@@ -1,8 +1,8 @@
 ---
 layout: post
-title: 如何处理异常
+title: 生成器与协程
 categories: 语言特性
-tags: Exception
+tags: Python
 ---
 {:toc}
 

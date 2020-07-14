@@ -1,8 +1,7 @@
 ---
 layout: post
-title: 如何处理异常
+title: yield from 原理
 categories: 语言特性
 tags: Exception
 ---
 {:toc}
-

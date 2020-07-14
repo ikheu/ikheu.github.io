@@ -18,8 +18,8 @@ Redis 中的数据对象包括：
 
 数据编码包括：
 - 整数 int
--  embstr
--  raw
+- embstr
+- raw
 - 哈希表 hashtab
 - 链表 linkedlist
 - 压缩列表 ziplist

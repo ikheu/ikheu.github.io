@@ -362,7 +362,7 @@ Exception: parse error
 'foo'
 ```
 
-![图 5.1 - 函数调用](/assets/img/function-calls.png){:width="300px"}
+![图 5.1 - 函数调用](/assets/img/function-calls.png)
 
 现在该讲 Python 生成器了，它使用相同的构建块——代码对象和栈帧——产生了惊人的效果。
 
@@ -403,7 +403,7 @@ Python 生成器封装了栈帧以及对某些代码的引用，即 `gen_fn` 的
 
 调用 `gen_fn` 的所有生成器都指向相同的代码。但是每个都有自己的栈帧。该栈帧不在任何实际的堆栈上，它位于堆内存中等待使用：
 
-![图 5.2 - 生成器](/assets/img/generator.png){:width="300px"}
+![图 5.2 - 生成器](/assets/img/generator.png)
 
 栈帧具有“最后一条指令”指针，该指针是最近执行的指令。刚开始时，最后一条指令指针为 -1，表示生成器尚未开始：
 
@@ -732,7 +732,7 @@ loop()
 
 当 `read` 函数产出 一个 future 时，`task` 通过 `yield from` 语句的通道接收它，就像 future 从 `fetch` 中直接产出一样。当事件循环处理 future 时，`task` 将它的结果发送给 `fetch`，并且该值被 `read` 接受，就像 `task` 被 `read` 直接驱动一样：
 
-![图 5.3 - Yield from](/assets/img/yield-from.png){:width="300px"}
+![图 5.3 - Yield from](/assets/img/yield-from.png)
 
 
 为了完善的协程实现，我们弥补了如下缺陷：我们的代码在等待 future 时使用 `yield`，但在将其委托给子协程时使用 `yield from`。如果每当协程暂停时都使用 `yield from`，则会更加完善。这样，协程就不必关心它等待什么类型的东西。
@@ -940,7 +940,7 @@ worker 们之间通过队列来协调。通过下面这句来获取新链接：
 
 我们使用的 `aiohttp` 库，在默认情况下使用重定向，并提供最终的响应。但我们不用这种默认行为，而将重定向交给爬虫程序处理，这样就可以合并相同的目标地址：如果 URL 已经在 `self.seen_urls` 中了，并且在别的入口点已经开始抓取该链接：
 
-![图 5.4 - 重定向](/assets/img/redirects.png){:width="300px"}
+![图 5.4 - 重定向](/assets/img/redirects.png)
 
 爬虫程序获取 “foo”，并发现它重定向到 “baz”，因此将 “baz” 添加到队列和 `seen_urls` 中。如果获取的下一页是 “bar” 也重定向到 “baz”，则程序不会再次将 “baz” 塞入队列。如果响应是页面而不是重定向，`fetch` 则对其进行解析以获取链接并将新链接放入队列。
 
