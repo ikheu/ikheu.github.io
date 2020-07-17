@@ -1,6 +1,6 @@
 ---
 layout: post
-title: yield from 原理
+title: Python 自定义字典
 categories: 语言特性
 tags: Python
 ---
