@@ -103,6 +103,10 @@ class JsDict(dict):
 下面是子类化 `UserDict` 的完整代码：
 
 ```python
+import keyword
+from collections import UserDict
+
+
 class JsDict(UserDict):
     def __getattr__(self, key):
         try:
