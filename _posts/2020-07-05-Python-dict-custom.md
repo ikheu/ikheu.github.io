@@ -8,9 +8,9 @@ tags: Python
 
 对 Python 字典进行扩展，支持像访问属性一样访问字典数据。
 
-**继承 dict**
+## 继承 dict
 
-直接继承 `dict` 类，分别使用特殊函数 `__getattr__` 和 `__setattr__` 来支持字典数据的读和写。特殊方法的实现除了要满足目标外，还要保证其他相关函数有正常的行为。判断对象的属性是否存在的 `hasattr` 函数与 `__getattr__` 有关。`hasattr` 调用 `getattr` 函数，看是否抛出 `AttributeError` 异常。`getattr(obj, 'attr')` 等价于点操作 `obj.attr`，它首先在 `__dict__` 中查找属性，没找到就会调用 `__getattr__`。因此在 `__getattr__` 中必须捕获 `KeyError` 并抛出 `AttributeError`，这样使 `hasattr` 有合理的输出，而不抛出令人疑惑的 `KeyError`。
+直接继承 `dict` 类，分别使用特殊方法 `__getattr__` 和 `__setattr__` 来支持字典数据的读和写。特殊方法的使用除了要满足目标外，还要保证其他相关函数有正常的行为。判断对象的属性是否存在的 `hasattr` 函数与 `__getattr__` 有关。`hasattr` 调用 `getattr` 函数，看是否抛出 `AttributeError` 异常。`getattr(obj, 'attr')` 等价于点操作 `obj.attr`，它首先在 `__dict__` 中查找属性，没找到就会调用 `__getattr__`。因此在 `__getattr__` 中必须捕获 `KeyError` 并抛出 `AttributeError`，这样使 `hasattr` 有合理的输出，而不抛出令人疑惑的 `KeyError`。
 
 `getattr`，`__getattr__` 和 `__getattribute__` 在命名和行为上容易搞错，涉及这些方法的定义时要小心处理。
 
@@ -96,7 +96,7 @@ class JsDict(dict):
 
 实际上，内置的类型 `dict` 使用 C 语言实现，在执行上会走一些捷径，可能会忽略用户定义的方法，导致子类的行为与预期不符。可以使用 `collections.UserDict `来进行扩展，而不要使用内置类型。
 
-**继承 UserDict**
+## 继承 UserDict
 
 `UserDict` 使用 Python 实现了一遍字典。其内部维护了一个 `dict` 实例 `self.data`，操作 `self.data` 而非 `self` 可以有效避免无限递归。`collections` 中还有 `UserList` 和 `UserString`，分别用于列表和字符串的扩展。
 
