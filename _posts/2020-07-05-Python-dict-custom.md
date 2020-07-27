@@ -10,9 +10,7 @@ tags: Python
 
 ## 继承 dict
 
-直接继承 `dict` 类，分别使用特殊方法 `__getattr__` 和 `__setattr__` 来支持字典数据的读和写。特殊方法的使用除了要满足目标外，还要保证其他相关函数有正常的行为。判断对象的属性是否存在的 `hasattr` 函数与 `__getattr__` 有关。`hasattr` 调用 `getattr` 函数，看是否抛出 `AttributeError` 异常。`getattr(obj, 'attr')` 等价于点操作 `obj.attr`，它首先在 `__dict__` 中查找属性，没找到就会调用 `__getattr__`。因此在 `__getattr__` 中必须捕获 `KeyError` 并抛出 `AttributeError`，这样使 `hasattr` 有合理的输出，而不抛出令人疑惑的 `KeyError`。
-
-`getattr`，`__getattr__` 和 `__getattribute__` 在命名和行为上容易搞错，涉及这些方法的定义时要小心处理。
+直接继承 `dict` 类，分别使用特殊方法 `__getattr__` 和 `__setattr__` 来支持字典数据的读和写。
 
 ```python
 # 初版 JsDict，继承内置的 dict
@@ -25,6 +23,10 @@ class JsDict(dict):
     def __setattr__(self, key, value):
         self[key] = value
 ```
+
+特殊方法的使用除了要满足目标外，还要保证其他相关函数有正常的行为。判断对象的属性是否存在的 `hasattr` 函数与 `__getattr__` 有关。`hasattr` 调用 `getattr` 函数，看是否抛出 `AttributeError` 异常。`getattr(obj, 'attr')` 等价于点操作 `obj.attr`，它首先在 `__dict__` 中查找属性，没找到就会调用 `__getattr__`。因此在 `__getattr__` 中必须捕获 `KeyError` 并抛出 `AttributeError`，这样使 `hasattr` 有合理的输出，而不抛出令人疑惑的 `KeyError`。
+
+`getattr`，`__getattr__` 和 `__getattribute__` 在命名和行为上容易搞错，涉及这些方法的定义时要小心处理。
 
 下面是使用 `JsDict` 的一个示例，似乎已经大功告成了。
 
