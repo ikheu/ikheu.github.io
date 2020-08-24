@@ -4,12 +4,11 @@ title:  Redis 中的数据对象及使用场景
 categories: 数据库
 tags: Redis
 ---
-* content
 {:toc}
 
 Redis 的数据系统设计体现了分层设计的特点。自顶向下来看，用户程序（如缓存模块）使用 Redis 提供的命令来操作数据。每个操作数据的命令与特定的数据对象绑定，每个数据对象的由不同编码来实现。我们可以根据具体场景选择特定的数据对象，而每个特定的数据对象又可以根据性能等因素选择相应的编码。这种分层设计是数据抽象思想的运用，它可以降低系统的复杂度，让设计复杂的软件变得容易。每一层将使用与实现隔离，有利于保证不同场景下的使用效率，同时也很容易增加命令、添加新的数据对象以及修改数据对象的编码等。
 
-![Redis 设计](../assets/img/redis.svg)
+![Redis 设计](/assets/img/redis.svg)
 
 ## 数据
 
@@ -50,7 +49,7 @@ typedef struct redisObject {
 - 整数集合 intset
 - 跳跃表 skiplist
 
-![Redis 设计](../assets/img/redis_obj.svg)
+![Redis 设计](/assets/img/redis_obj.svg)
 
 出于性能考虑，当数据满足一定条件时会导致编码发生变化。两种因素会影响数据对象的编码，包括：
 
@@ -96,7 +95,7 @@ INCR IPLim_user101
 
 对存储层的数据进行缓存，数据优先从缓存区获取。一个典型的示例如下：
 
-![Redis 设计](../assets/img/redis_cache.svg)
+![Redis 设计](/assets/img/redis_cache.svg)
 
 使用缓存可以提升数据的访问速度以及降低存储层的压力，但使用时也需要留意诸多问题：
 

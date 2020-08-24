@@ -6,8 +6,6 @@ categories: 物理
 tags: Fortran
 mathjax: true
 ---
-
-* content
 {:toc}
 
 我学的是核科学与技术专业，本科和硕士期间写了不少程序，如计算堆芯中子动力学的，计算流体力学的。但多数仅针对具体问题，通用性有些不足。硕士修了一门仿真技术的课程，我的作业是求解点堆中子动力学程序，靠这个还拿了优秀。觉得这个程序还蛮通用的，对于同专业的搞个大作业，或用于毕设等或许有帮助。
@@ -100,6 +98,6 @@ $$
 
 这里给出了四种反应性引入，包括正反应性阶跃、负反应性阶跃、反应性线性变化、反应性正弦变化情形下，典型热中子堆的中子密度响应曲线：
 
-![](http://cdn.moastro.cn/user_assets/5b5fc33c393e344a4f4dd646/20190705230207/results.jpg)
+![](/assets/img/point_results.jpg)
 
 github链接中有个 [点堆模型与求解.pdf](https://github.com/ikheu/point_reactor/blob/master/%E7%82%B9%E5%A0%86%E6%A8%A1%E5%9E%8B%E4%B8%8E%E6%B1%82%E8%A7%A3.pdf) 的文件，可以在其中找到计算结果与解析解的比较和分析。计算程序还适用于快中子堆的求解。

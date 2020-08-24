@@ -4,7 +4,6 @@ title:  一个基于 canvas 的画板
 categories: 前端
 tags: Python
 ---
-* content
 {:toc}
 
 
