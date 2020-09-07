@@ -20,6 +20,7 @@ class JsDict(dict):
             return self[key]
         except KeyError:
             raise AttributeError("JsDict object has no attribute '%s'" % key)
+            
     def __setattr__(self, key, value):
         self[key] = value
 ```
