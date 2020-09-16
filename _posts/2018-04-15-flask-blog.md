@@ -271,7 +271,7 @@ def login():
 <image src="/assets/img/code_gauss.png" style="width: 100px; margin: 5px"></image>
 
 
-## 3 Tinymce编辑器
+## 3. Tinymce编辑器
 
 之前Flask博客的文本编辑器使用的是markdown，对不熟悉该语法的普通用户不够友好，因此这里为博客添加个简单易用的Tinymce文本编辑器。
 
