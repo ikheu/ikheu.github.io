@@ -14,7 +14,7 @@ tags: Python
 - 设置画板背景色
 - 将画板保存成图片
 
-demo见：[drawing_board](https://github.com/ikheu/frontend/blob/master/drawing_board/index.html)
+demo见：[drawing_board](/demos/canvas/canvas.html)
 。最后的效果长这样：
 
 ![](/assets/img/canvas.png){:width="300px"}
