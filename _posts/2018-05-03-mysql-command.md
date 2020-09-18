@@ -1,16 +1,16 @@
 ---
 layout: post
-title: MySQL 命令总结
+title: MySQL Crash Course 命令总结
 categories: 数据库
 tags: MySQL
 ---
 {:toc}
 
-经常不写 SQL 语句容易生疏，所以这里总结了 MySQL 的命令，用于快速回顾。所有示例摘录自 [MySQL 必知必会]()一书。
+经常不写 SQL 语句容易生疏，所以这里总结了 MySQL 的命令，用于快速回顾。所有示例摘录自 [MySQL Crash Course](https://forta.com/books/0672327120/)一书。
 
 ## 数据表
 
-根据教材提供的 SQL 脚本，构造数据库 crashcourse，它包含以下表：
+使用网站提供的 SQL 文件，建立数据库 crashcourse，它包含以下表：
 
 ```
 mysql> show tables;
@@ -26,6 +26,15 @@ mysql> show tables;
 +-----------------------+
 ```
 
+使用 Workbench 生成该数据库的 EER 图：
+
+![](/assets/img/eer.svg){:width="100%"}
+
+
+## 检索数据
+
+`select` 命令的通用形式如下：
+
 ``` sql
 select 选择字段
 from 从某个表
@@ -36,7 +45,7 @@ order by 结果排序
 limit 限制集合条数
 ```
 
-## 检索数据
+简单的检索命令：
 
 ```sql
 # 选择一列
