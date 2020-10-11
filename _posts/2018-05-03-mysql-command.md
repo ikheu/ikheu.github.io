@@ -6,7 +6,7 @@ tags: MySQL
 ---
 {:toc}
 
-经常不写 SQL 语句容易生疏，所以这里总结了 MySQL 的命令，用于快速回顾。所有示例摘录自 [MySQL Crash Course](https://forta.com/books/0672327120/)一书。
+经常不写 SQL 语句容易生疏，所以这里总结了 MySQL 的命令，用于快速回顾。所有示例摘录自 [MySQL Crash Course](https://forta.com/books/0672327120/) 一书。
 
 ## 数据表
 
