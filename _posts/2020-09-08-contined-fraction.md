@@ -148,7 +148,7 @@ def cf_general(f1, f2, count):
 3.141592653589791
 ```
 
-### 参考
+## 参考
 
 - [什么是数学](https://book.douban.com/subject/10455982/)
 - [连分数](https://zh.wikipedia.org/wiki/%E8%BF%9E%E5%88%86%E6%95%B0)
